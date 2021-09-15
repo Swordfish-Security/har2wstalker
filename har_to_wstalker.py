@@ -1,6 +1,5 @@
 import argparse
 import base64
-import codecs
 import json
 import logging
 from haralyzer_3 import *
@@ -35,7 +34,7 @@ def main():
     nl = '\r\n'
     wstalker_out = ''
 
-    # small workaround with encoding to parse Telerik Fiddler's .har files
+    #  workaround with encoding to parse Telerik Fiddler's .har files
     with open(filename_sanitizer(HAR_FILENAME), 'r', encoding='utf-8-sig') as har_file:
         logging.info('Reading file')
         har_contents = har_file.read()
@@ -48,7 +47,7 @@ def main():
         req_raw_headers = har_page_entry.request.raw_entry['headers']
         resp_raw_headers = har_page_entry.response.raw_entry['headers']
 
-        # Some HTTP requests (esp. in HTTP/2) doesn't have a specific Host: header so we'll build it ourselves
+        # Some HTTP requests (esp. in HTTP/2) doesn't have a separate  Host: header so we'll build it ourselves
         if not har_page_entry.request.host:
             req_raw_headers.append({'name': 'Host', 'value': urlparse(har_page_entry.request.url).netloc})
 
@@ -63,15 +62,20 @@ def main():
         # Building HTTP headers for requests and response
         req_headers = ''
         for header in req_raw_headers:
+            # workaround as Burp doesn't support Brotli compression algorithm so we wouldn't want to request it
+            if header['name'] == 'Accept-Encoding' and 'br' in header['value']:
+                header['value'] = header['value'].replace(', br', '')
             req_headers += "%s: %s" % (header['name'], header['value']) + nl
+
         resp_headers = ''
         for header in resp_raw_headers:
             resp_headers += "%s: %s" % (header['name'], header['value']) + nl
 
         # POST contents
         post_body = ''
-        if 'postData' in har_page_entry.request:
-            post_body = har_page_entry.request['postData']['text'] + nl
+        if not har_page_entry.request['postData']['text'] == '':
+            post_body = har_page_entry.request['postData']['text']
+
         # TODO: if needed it is possible to return response data as well
         req = req_query + nl + req_headers + nl + post_body
         resp = resp_code + nl + resp_headers
